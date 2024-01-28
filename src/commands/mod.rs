@@ -1,3 +1,3 @@
 pub mod process;
-pub mod validate;
-pub mod write_rom;
+mod validate;
+mod write_rom;
