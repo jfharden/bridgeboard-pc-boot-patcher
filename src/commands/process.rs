@@ -39,8 +39,6 @@ pub fn process(args: Cli) -> Result<String, String> {
 
     match args.command {
         Commands::Validate {..} => validate(option_rom),
-        Commands::WriteRom { output_path, force, rom_only, update_checksum, patch_rom } => {
-            write_rom(option_rom, args.source_path, rom_start_location, output_path, force, rom_only, update_checksum, patch_rom)
-        },
+        Commands::WriteRom(write_rom_args) => write_rom(option_rom,write_rom_args, args.source_path, rom_start_location),
     }
 }

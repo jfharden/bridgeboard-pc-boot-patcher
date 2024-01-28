@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, Args};
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -24,27 +24,30 @@ impl Cli {
     }
 }
 
-#[derive(Subcommand)]
+#[derive(Debug, Subcommand)]
 pub enum Commands {
     Validate {},
-    WriteRom {
-        /// File path to write the output to
-        output_path: std::path::PathBuf,
+    WriteRom(WriteRomArgs)
+}
 
-        /// Force overwrite an existing output file
-        #[arg(short, long)]
-        force: bool,
+#[derive(Debug, Args)]
+pub struct WriteRomArgs {
+    /// File path to write the output to
+    pub output_path: std::path::PathBuf,
 
-        /// Only write the discovered ROM and not the whole file
-        #[arg(short, long)]
-        rom_only: bool,
+    /// Force overwrite an existing output file
+    #[arg(short, long)]
+    pub force: bool,
 
-        /// Fix the checksum by altering the final byte of the rom
-        #[arg(short, long)]
-        update_checksum: bool,
+    /// Only write the discovered ROM and not the whole file
+    #[arg(short, long)]
+    pub rom_only: bool,
 
-        /// Patch the ROM with our hack
-        #[arg(short, long)]
-        patch_rom: bool,
-    }
+    /// Fix the checksum by altering the final byte of the rom
+    #[arg(short, long)]
+    pub update_checksum: bool,
+
+    /// Patch the ROM with our hack
+    #[arg(short, long)]
+    pub patch_rom: bool,
 }
