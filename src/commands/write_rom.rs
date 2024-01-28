@@ -1,11 +1,9 @@
-use std::path::PathBuf;
-
 use crate::FileHandler;
 use crate::option_rom::{OptionRom, OptionRomError};
 use crate::option_rom_patcher;
-use crate::cli::WriteRomArgs;
+use crate::cli::{SourceArgs, WriteRomArgs};
 
-pub fn write_rom(option_rom: OptionRom, write_rom_args: WriteRomArgs, source_path: PathBuf, rom_start_location: usize) -> Result<String, String> {
+pub fn write_rom(option_rom: OptionRom, write_rom_args: WriteRomArgs, source_args: SourceArgs, rom_start_location: usize) -> Result<String, String> {
     if write_rom_args.output_path.exists() && ! write_rom_args.force {
         return Err("The output file exists and the force option was not specified".into());
     }
@@ -36,7 +34,7 @@ pub fn write_rom(option_rom: OptionRom, write_rom_args: WriteRomArgs, source_pat
             Err(e) => Err(format!("{}", e)),
         }
     } else {
-        match FileHandler::write_rom_in_file(&source_path, &write_rom_args.output_path, option_rom, rom_start_location) {
+        match FileHandler::write_rom_in_file(&source_args.source_path, &write_rom_args.output_path, option_rom, rom_start_location) {
             Ok(..) => Ok(format!("Rom written to {}", write_rom_args.output_path.display())),
             Err(e) => Err(format!("{}", e)),
         }

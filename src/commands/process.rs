@@ -7,16 +7,16 @@ use validate::validate;
 use write_rom::write_rom;
 
 pub fn process(args: Cli) -> Result<String, String> {
-    if ! args.source_path.exists() {
+    if ! args.source_args.source_path.exists() {
         return Err("The specified source file does not exist".into());
     }
 
-    let bytes = match FileHandler::read_source(&args.source_path) {
+    let bytes = match FileHandler::read_source(&args.source_args.source_path) {
         Ok(bytes) => bytes,
         Err(file_handler_error) => return Err(format!("{}", file_handler_error)),
     };
 
-    let rom_start_location: usize = if args.scan {
+    let rom_start_location: usize = if args.source_args.scan {
         println!("Scanning for possible option rom");
         match OptionRom::find_option_rom_start_in_bytes(&bytes) {
             Ok(rom_start_location) => {
@@ -26,7 +26,7 @@ pub fn process(args: Cli) -> Result<String, String> {
             Err(e) => return Err(format!("{}", e)),
         }
     } else {
-        match args.location {
+        match args.source_args.location {
             Some(location) => location,
             None => 0,
         }
@@ -39,6 +39,6 @@ pub fn process(args: Cli) -> Result<String, String> {
 
     match args.command {
         Commands::Validate {..} => validate(option_rom),
-        Commands::WriteRom(write_rom_args) => write_rom(option_rom,write_rom_args, args.source_path, rom_start_location),
+        Commands::WriteRom(write_rom_args) => write_rom(option_rom,write_rom_args, args.source_args, rom_start_location),
     }
 }
