@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
 
-use crate::OptionRom;
+use crate::option_rom::OptionRom;
 
 pub fn fixture_path(fixture_file: &str) -> PathBuf {
     let all_path_parts: Vec<&str> = vec![

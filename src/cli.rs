@@ -1,20 +1,4 @@
 use clap::{Parser, Subcommand};
-use std::fmt;
-
-#[derive(Debug)]
-pub enum ArgumentError {
-    SourceFileDoesNotExist,
-    OutputFileExists,
-}
-
-impl fmt::Display for ArgumentError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ArgumentError::SourceFileDoesNotExist => write!(f, "The specified source file does not exist"),
-            ArgumentError::OutputFileExists => write!(f, "The output file exists and the force option was not specified"),
-        }
-    }
-}
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -35,25 +19,8 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn new() -> Result<Cli, ArgumentError> {
-        let args = Cli::parse();
-
-        let source_path = args.source_path.as_path();
-
-        if ! source_path.exists() {
-            return Err(ArgumentError::SourceFileDoesNotExist)
-        }
-
-        match &args.command {
-            Commands::WriteRom { output_path, force, rom_only: _, update_checksum: _, patch_rom: _ } => {
-               if output_path.exists() && ! force {
-                   return Err(ArgumentError::OutputFileExists)
-               }
-            },
-            _ => {}
-        }
-
-        Ok(args)
+    pub fn new() -> Cli {
+        Cli::parse()
     }
 }
 
