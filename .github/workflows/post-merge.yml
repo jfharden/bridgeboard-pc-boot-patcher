@@ -19,8 +19,8 @@ jobs:
     needs:
       - test
     outputs:
-      release: ${{ steps.tag-release.outputs.release }}
-      version: ${{ steps.tag-release.outputs.version }}
+      release: "${{ steps.tag-release.outputs.release }}"
+      version: "${{ steps.tag-release.outputs.version }}"
 
     permissions:
       contents: write
@@ -30,6 +30,7 @@ jobs:
         with:
           fetch-depth: 0
       - shell: bash
+        id: tag-release
         name: tag-release
         run: |
           VERSION=$(yq -oy '.package.version' Cargo.toml)
