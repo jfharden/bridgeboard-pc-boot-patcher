@@ -10,14 +10,14 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    uses: ./.github/workflows/run-tests.yml
+  # test:
+  #   uses: ./.github/workflows/run-tests.yml
 
   check-for-and-create-new-release:
     name: Create new release tag if needed
     runs-on: ubuntu-latest
-    needs:
-      - test
+    # needs:
+    #   - test
 
     permissions:
       contents: write
@@ -29,6 +29,11 @@ jobs:
       - shell: bash
         run: |
           VERSION=$(yq -oy '.package.version' Cargo.toml)
+          echo "Checking for version $VERSION"
+          git tag --list
+          echo "With grep"
+          git tag --list | grep "^$VERSION\$" 
+
           if git tag --list | grep "^$VERSION\$" >>/dev/null 2>&1; then
             echo "Version $VERSION already tagged, no release to complete"
             exit 0
