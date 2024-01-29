@@ -1,10 +1,12 @@
-name: Test and Tag
+name: Release
 
 on:
+  pull_request:
+    branches:
+      - fix-release-workflow
   push:
     branches:
       - main
-      - fix-release-workflow
 
 permissions:
   contents: read
