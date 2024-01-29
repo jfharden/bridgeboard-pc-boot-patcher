@@ -30,6 +30,7 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
 
+          # Can build, but not test with cross
           - build: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
@@ -48,15 +49,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: Install cross
-        shell: bash
-        run: cargo install cross
       - name: Release build
         shell: bash
         run : |
-          cross build --release --target ${{ matrix.target }}
-      # - name: Run tests
-      #   shell: bash
-      #   run: |
-      #     cargo install cross
-      #     cross test --target ${{ matrix.target }} --all-features
+          cargo build --release --target ${{ matrix.target }}
+          #      - name: Run tests
+          #        shell: bash
+          #        run: |
+          #          cargo install cross
+          #          cross test --target ${{ matrix.target }} --all-features
+
