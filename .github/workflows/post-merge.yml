@@ -1,0 +1,80 @@
+# Thanks to https://dzfrias.dev/blog/deploy-rust-cross-platform-github-actions on which
+# most of this workflow was based
+name: Create Release
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/run-tests.yml
+
+  build-and-upload:
+    name: Build and Upload
+    needs:
+      - test
+
+    permissions:
+      contents: write
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        include:
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+
+          - build: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+
+          # Can build, but not test with cross
+          - build: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+
+          - build: windows
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Release build
+        shell: bash
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Build archive
+        shell: bash
+        run: |
+          binary_name="bridgeboard-pc-boot-patcher"
+
+          dirname="$binary_name-${{ env.VERSION }}-${{ matrix.target }}"
+          mkdir "$dirname"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "target/${{ matrix.target }}/release/$binary_name.exe" "$dirname"
+          else
+            mv "target/${{ matrix.target }}/release/$binary_name" "$dirname"
+          fi
+
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a "$dirname.zip" "$dirname"
+            echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+          else
+            tar -czf "$dirname.tar.gz" "$dirname"
+            echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+          fi
+ 
+      # - name: Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     files: |
+      #       ${{ env.ASSET }}
