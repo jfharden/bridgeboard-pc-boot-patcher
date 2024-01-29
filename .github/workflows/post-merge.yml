@@ -1,7 +1,6 @@
-name: Release
+name: Post-merge Test and Release
 
 on:
-  pull_request:
   push:
     branches:
       - main
@@ -21,9 +20,6 @@ jobs:
     outputs:
       release: "${{ steps.tag-release.outputs.release }}"
       version: "${{ steps.tag-release.outputs.version }}"
-
-    permissions:
-      contents: write
 
     steps:
       - uses: actions/checkout@v4
@@ -116,4 +112,3 @@ jobs:
           generate_release_notes: true
           files: |
             ${{ env.ASSET }}
-
