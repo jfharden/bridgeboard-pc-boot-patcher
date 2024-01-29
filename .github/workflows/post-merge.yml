@@ -93,7 +93,7 @@ jobs:
         run: |
           binary_name="bridgeboard-pc-boot-patcher"
 
-          dirname="$binary_name-${{ jobs.check-for-release.outputs.version }}-${{ matrix.target }}"
+          dirname="$binary_name-${{ needs.check-for-release.outputs.version }}-${{ matrix.target }}"
           mkdir "$dirname"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             mv "target/${{ matrix.target }}/release/$binary_name.exe" "$dirname"
@@ -112,8 +112,8 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
-          name: ${{ jobs.check-for-release.outputs.version }}
-          tag_name: ${{ jobs.check-for-release.outputs.version }}
+          name: ${{ needs.check-for-release.outputs.version }}
+          tag_name: ${{ needs.check-for-release.outputs.version }}
           generate_release_notes: true
           files: |
             ${{ env.ASSET }}
