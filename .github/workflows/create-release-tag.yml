@@ -1,0 +1,38 @@
+name: Create Release Tag
+
+on:
+  push:
+    branches:
+      - main
+      - cross-platform-tests
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/run-tests.yml
+
+  check-for-new-release:
+    name: Check for new release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          VERSION=$(yq -oy '.package.version' Cargo.toml)
+          if git tag --list | grep "^$VERSION\$" >>/dev/null 2>&1; then
+            echo "Version $VERSION already tagged, no release to complete"
+            exit 0
+          fi
+
+          echo "Continuing to create release tag"
+
+          git config user.name BridgeBoard-PC-Boot-Patcher-AutoRelease
+
+          git tag "$VERSION"
+          git push origin "$VERSION"
