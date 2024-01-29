@@ -51,7 +51,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
   build-and-upload:
-    if: needs.check-for-release.outputs.release == "true"
+    if: ${{ needs.check-for-release.outputs.release == 'true' }}
     needs: check-for-release
     name: Build and Upload
 
