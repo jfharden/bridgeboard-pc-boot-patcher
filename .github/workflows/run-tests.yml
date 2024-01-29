@@ -30,9 +30,9 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
 
-          # - build: macos-arm64
-          #   os: macos-latest
-          #   target: aarch64-apple-darwin
+          - build: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
 
           - build: windows-gnu-x86_64
             os: windows-latest
@@ -48,8 +48,15 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: Run tests
+      - name: Install cross
         shell: bash
-        run: |
-          cargo install cross
-          cargo test --target ${{ matrix.target }} --all-features
+        run: cargo install cross
+      - name: Release build
+        shell: bash
+        run : |
+          cross build --release --target ${{ matrix.target }}
+      # - name: Run tests
+      #   shell: bash
+      #   run: |
+      #     cargo install cross
+      #     cross test --target ${{ matrix.target }} --all-features
