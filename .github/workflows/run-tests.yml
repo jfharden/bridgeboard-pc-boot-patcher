@@ -1,3 +1,5 @@
+# Thanks to https://dzfrias.dev/blog/deploy-rust-cross-platform-github-actions on which
+# most of this workflow was based
 name: Run Tests
 
 on:
@@ -26,11 +28,6 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
 
-          # Can build, but not test with cross
-          - build: macos-arm64
-            os: macos-latest
-            target: aarch64-apple-darwin
-
           - build: windows-gnu-x86_64
             os: windows-latest
             target: x86_64-pc-windows-gnu
@@ -41,13 +38,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - name: Release build
+      - name: Run tests
         shell: bash
-        run : |
-          cargo build --release --target ${{ matrix.target }}
-          #      - name: Run tests
-          #        shell: bash
-          #        run: |
-          #          cargo install cross
-          #          cross test --target ${{ matrix.target }} --all-features
+        run: |
+          cargo test --target "${{ matrix.target }}" --all-features
 
