@@ -1,0 +1,46 @@
+name: Test and Tag
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    uses: ./.github/workflows/run-tests.yml
+
+  check-for-and-create-new-release:
+    name: Create new release tag if needed
+    runs-on: ubuntu-latest
+    needs:
+      - test
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          VERSION=$(yq -oy '.package.version' Cargo.toml)
+          echo "Checking for version $VERSION"
+          git tag --list
+          echo "With grep"
+          git tag --list | grep "^$VERSION\$" 
+
+          if git tag --list | grep "^$VERSION\$" >>/dev/null 2>&1; then
+            echo "Version $VERSION already tagged, no release to complete"
+            exit 0
+          fi
+
+          echo "Continuing to create release tag"
+
+          git config user.name BridgeBoard-PC-Boot-Patcher-AutoRelease
+
+          git tag "$VERSION"
+          git push origin "$VERSION"
