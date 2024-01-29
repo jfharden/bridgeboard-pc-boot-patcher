@@ -4,20 +4,19 @@ on:
   push:
     branches:
       - main
-      - cross-platform-tests
 
 permissions:
   contents: read
 
 jobs:
-  # test:
-  #   uses: ./.github/workflows/run-tests.yml
+  test:
+    uses: ./.github/workflows/run-tests.yml
 
   check-for-and-create-new-release:
     name: Create new release tag if needed
     runs-on: ubuntu-latest
-    # needs:
-    #   - test
+    needs:
+      - test
 
     permissions:
       contents: write

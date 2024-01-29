@@ -10,14 +10,11 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-and-upload:
     name: Build and Upload
-
-    permissions:
-      contents: write
 
     runs-on: ${{ matrix.os }}
 
@@ -32,7 +29,7 @@ jobs:
             os: macos-latest
             target: x86_64-apple-darwin
 
-          # Can build, but not test with cross
+          # Can build, but not test
           - build: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
