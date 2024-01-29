@@ -2,8 +2,6 @@ name: Release
 
 on:
   pull_request:
-    branches:
-      - fix-release-workflow
   push:
     branches:
       - main
@@ -54,6 +52,7 @@ jobs:
 
   build-and-upload:
     if: jobs.check-for-release.outputs.release == "true"
+    needs: check-for-release
     name: Build and Upload
 
     runs-on: ${{ matrix.os }}
@@ -84,12 +83,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Release build
+      - name: Build Release Binaries
         shell: bash
         run: |
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Build archive
+      - name: Create Release Archives
         shell: bash
         run: |
           binary_name="bridgeboard-pc-boot-patcher"
