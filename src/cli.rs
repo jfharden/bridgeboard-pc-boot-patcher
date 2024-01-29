@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand, Args};
+use clap_num::maybe_hex;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -28,7 +29,7 @@ pub struct SourceArgs {
     pub source_path: std::path::PathBuf,
 
     /// ROM location in the file (in hex if specified with a leading 0x)
-    #[arg(short, long, conflicts_with = "scan")]
+    #[arg(short, long, conflicts_with = "scan", value_parser=maybe_hex::<usize>)]
     pub location: Option<usize>,
 
     /// Scan in the source file for an Option Rom
