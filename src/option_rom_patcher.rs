@@ -1,52 +1,59 @@
 use std::fmt;
 
-use crate::option_rom::{OptionRom, OptionRomError, OPTION_ROM_HEADER};
+use crate::option_rom::{OptionRom, OptionRomError};
 
 #[derive(Debug)]
 pub enum OptionRomPatcherError {
-    CouldntLocateInitialJump,
     OptionRomGenerationError(OptionRomError),
-    CouldntLocateReturnToBIOS,
-    NotEnoughBytesAfterReturnToBIOS,
-    BytesAfterReturnToBIOSDontLookEmpty,
+    CouldntLocateHddReadyCheck,
+    CouldntLocateAfterInt13Set,
+    JumpLengthTooBig
 }
 
 impl fmt::Display for OptionRomPatcherError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            OptionRomPatcherError::CouldntLocateInitialJump => write!(f, "Couldn't find the initial JMP SHORT instruction."),
+            OptionRomPatcherError::CouldntLocateHddReadyCheck => write!(f, "Couldn't find the HDD ready check."),
+            OptionRomPatcherError::CouldntLocateAfterInt13Set => write!(f, "Couldn't find the end of the code which sets the INT13 handler."),
+            OptionRomPatcherError::JumpLengthTooBig => write!(f, "The distance to JMP to avoid setting INT13 is too big."),
             OptionRomPatcherError::OptionRomGenerationError(e) => write!(f, "{}", e),
-            OptionRomPatcherError::CouldntLocateReturnToBIOS => write!(f, "Coulnd't find the expected INT 18h followed by IRET instructions"),
-            OptionRomPatcherError::NotEnoughBytesAfterReturnToBIOS => write!(f, "Not enough bytes after the return (INT 18h followed by IRET) to BIOS"),
-            OptionRomPatcherError::BytesAfterReturnToBIOSDontLookEmpty => write!(f, "The bytes after the return (INT 18h followed by IRET) to BIOS do not look empty"),
         }
     }
 }
 
 const X86_INT: u8 = 0xCD;
-const X86_IRET: u8 = 0xCF;
-const X86_MOV_INTO_AX: u8 = 0xA1;
-const X86_MOV_FROM_AX: u8 = 0xA1;
-const X86_PUSH_AX: u8 = 0x50;
+const X86_MOV_INTO_AH: u8 = 0xb4;
+const X86_MOV_INTO_DL: u8 = 0xb2;
 const X86_POP_AX: u8 = 0x58;
-const X86_JMP_NEAR: u8 = 0xEB;
+const X86_POP_DX: u8 = 0x5a;
+const X86_POP_ES: u8 = 0x07;
+const X86_JC: u8 = 0x72;
+const X86_JMP: u8 = 0xeb;
 
-const PATCH_HEADER: [u8; 8] = [
-    X86_PUSH_AX,
-    X86_MOV_INTO_AX, 0x64, 0x00,  // MOV AX, [0x0064]
-    X86_PUSH_AX,
-    X86_MOV_INTO_AX, 0x66, 0x00, // MOV AX, [0x0066]
+const X86_MOV_SEGMENT_REGISTER_TO_MEMORY_ADDRESS: u8 = 0x8c;
+const X86_MOV_GENERAL_REGISTER_TO_MEMORY_ADDRESS: u8 = 0x89;
+const X86_ES_SEGMENT_REGISTER: u8 = 0x06;
+const X86_DI_GENERAL_REGISTER: u8 = 0x3e;
+
+const HDD_READY_CHECK_SEARCH: [u8; 9] = [
+    X86_MOV_INTO_AH, 0x10,
+    X86_MOV_INTO_DL, 0x80,
+    X86_INT, 0x13,
+    X86_POP_DX,
+    X86_POP_AX,
+    X86_JC,
 ];
 
-const PATCH_FOOTER: [u8; 8] = [
-    X86_MOV_FROM_AX, 0x66, 0x00, // MOV [0x0066], AX
-    X86_POP_AX,
-    X86_MOV_FROM_AX, 0x64, 0x00, // MOV [0x0064], AX
-    X86_POP_AX,
+const INT_13_SET_FINISHED_SEARCH: [u8; 9] = [
+    X86_MOV_SEGMENT_REGISTER_TO_MEMORY_ADDRESS, X86_ES_SEGMENT_REGISTER, 0x1e, 0x20,
+    X86_MOV_GENERAL_REGISTER_TO_MEMORY_ADDRESS, X86_DI_GENERAL_REGISTER, 0x1c, 0x20,
+    X86_POP_ES,
 ];
 
 pub fn patch_rom(option_rom: &OptionRom) -> Result<OptionRom, OptionRomPatcherError> {
+    println!("ORIGINAL_ROM_SIZE: 0x{:04X}", option_rom.bytes.len());
     let patched_rom_bytes: Vec<u8> = generate_patched_rom(option_rom)?;
+    println!("PATCHED_ROM_SIZE: 0x{:04X}", patched_rom_bytes.len());
     let mut patched_rom = match OptionRom::from(patched_rom_bytes, 0) {
         Ok(patched_rom) => patched_rom,
         Err(e) => {
@@ -59,67 +66,60 @@ pub fn patch_rom(option_rom: &OptionRom) -> Result<OptionRom, OptionRomPatcherEr
 }
 
 fn generate_patched_rom(option_rom: &OptionRom) -> Result<Vec<u8>, OptionRomPatcherError> {
-    let new_entrypoint_jump_size: u8 = match calculate_new_entrypoint_jump(option_rom) {
+    let location_of_hdd_not_ready_jump = match find_location_of_hdd_not_ready_jump(option_rom) {
         Err(e) => return Err(e),
-        Ok(new_entrypoint_jump_size) => new_entrypoint_jump_size,
+        Ok(location) => location,
     };
-    let post_header_patch_location: usize = 5 + PATCH_HEADER.len();
-    let return_to_bios_location = find_location_of_return_to_bios(option_rom)?;
-    let post_footer_patch_location: usize = return_to_bios_location + PATCH_FOOTER.len() + 1;
+    let location_of_int_13_set_finished = match find_location_after_int_13_set(option_rom) {
+        Err(e) => return Err(e),
+        Ok(location) => location,
+    };
 
-    let mut new_rom_bytes: Vec<u8> = vec![OPTION_ROM_HEADER[0], OPTION_ROM_HEADER[1], option_rom.bytes[2]]; // Option ROM header
-    new_rom_bytes.extend_from_slice(&PATCH_HEADER);                     // Our patch code
-    new_rom_bytes.push(X86_JMP_NEAR);                                           // JMP SHORT
-    new_rom_bytes.push(new_entrypoint_jump_size);                       // JMP Location
+    // Need to add 2 on the location of the jump since thats where the JMP instruction will count from
+    let jump_length: u8 = match u8::try_from(location_of_int_13_set_finished - (location_of_hdd_not_ready_jump+2)) {
+        Ok(jump_length) => jump_length,
+        Err(_) => return Err(OptionRomPatcherError::JumpLengthTooBig),
+    };
 
-
-    new_rom_bytes.extend_from_slice(&option_rom.bytes[post_header_patch_location..return_to_bios_location]);    // ROM upto return to bios
-    new_rom_bytes.extend_from_slice(&PATCH_FOOTER);
-    new_rom_bytes.push(X86_IRET);
-    new_rom_bytes.extend_from_slice(&option_rom.bytes[post_footer_patch_location..]);
-
+    let mut new_rom_bytes: Vec<u8> = option_rom.bytes[0..location_of_hdd_not_ready_jump].to_vec();
+    new_rom_bytes.push(X86_JMP);
+    new_rom_bytes.push(jump_length);
+    new_rom_bytes.extend_from_slice(&option_rom.bytes[location_of_hdd_not_ready_jump+2..]);
     Ok(new_rom_bytes)
 }
 
-fn calculate_new_entrypoint_jump(option_rom: &OptionRom) -> Result<u8, OptionRomPatcherError> {
-    let existing_entrypoint_jump_size = get_existing_entrypoint_jump(option_rom)?;
-
-    return Ok(existing_entrypoint_jump_size - PATCH_HEADER.len() as u8);
-}
-
-fn get_existing_entrypoint_jump(option_rom: &OptionRom) -> Result<u8, OptionRomPatcherError> {
-    if option_rom.bytes[3] != X86_JMP_NEAR {
-        return Err(OptionRomPatcherError::CouldntLocateInitialJump)
-    }
-
-    Ok(option_rom.bytes[4])
-}
-
-fn find_location_of_return_to_bios(option_rom: &OptionRom) -> Result<usize, OptionRomPatcherError> {
-    for i in 0..option_rom.bytes.len()-3 {
-        if option_rom.bytes[i] == X86_INT && 
-           option_rom.bytes[i+1] == 0x18 && 
-           option_rom.bytes[i+2] == X86_IRET {
-            check_for_free_space(option_rom, i+3)?;
-            return Ok(i+2);
+fn find_location_of_hdd_not_ready_jump(option_rom: &OptionRom) -> Result<usize, OptionRomPatcherError> {
+    for i in 0..option_rom.bytes.len()-10 {
+        if option_rom.bytes[i] == HDD_READY_CHECK_SEARCH[0] &&
+           option_rom.bytes[i+1] == HDD_READY_CHECK_SEARCH[1] &&
+           option_rom.bytes[i+2] == HDD_READY_CHECK_SEARCH[2] &&
+           option_rom.bytes[i+3] == HDD_READY_CHECK_SEARCH[3] &&
+           option_rom.bytes[i+4] == HDD_READY_CHECK_SEARCH[4] &&
+           option_rom.bytes[i+5] == HDD_READY_CHECK_SEARCH[5] &&
+           option_rom.bytes[i+6] == HDD_READY_CHECK_SEARCH[6] &&
+           option_rom.bytes[i+7] == HDD_READY_CHECK_SEARCH[7] &&
+           option_rom.bytes[i+8] == HDD_READY_CHECK_SEARCH[8] {
+            return Ok(i+8);
         }
     }
 
-    Err(OptionRomPatcherError::CouldntLocateReturnToBIOS)
+    Err(OptionRomPatcherError::CouldntLocateHddReadyCheck)
 }
 
-fn check_for_free_space(option_rom: &OptionRom, start_position: usize) -> Result<(), OptionRomPatcherError> {
-    if option_rom.bytes.len() < start_position + PATCH_FOOTER.len() {
-        return Err(OptionRomPatcherError::NotEnoughBytesAfterReturnToBIOS);
-    }
-
-    for i in 0..PATCH_FOOTER.len() {
-        // I'm not sure why but the pc.boot option rom sometimes has 0 and sometimes has 0x61 as
-        // blank space
-        if option_rom.bytes[start_position + i] != 0 && option_rom.bytes[start_position + i] != 0x61 {
-            return Err(OptionRomPatcherError::BytesAfterReturnToBIOSDontLookEmpty);
+fn find_location_after_int_13_set(option_rom: &OptionRom) -> Result<usize, OptionRomPatcherError> {
+    for i in 0..option_rom.bytes.len()-10 {
+        if option_rom.bytes[i] == INT_13_SET_FINISHED_SEARCH[0] &&
+           option_rom.bytes[i+1] == INT_13_SET_FINISHED_SEARCH[1] &&
+           option_rom.bytes[i+2] == INT_13_SET_FINISHED_SEARCH[2] &&
+           option_rom.bytes[i+3] == INT_13_SET_FINISHED_SEARCH[3] &&
+           option_rom.bytes[i+4] == INT_13_SET_FINISHED_SEARCH[4] &&
+           option_rom.bytes[i+5] == INT_13_SET_FINISHED_SEARCH[5] &&
+           option_rom.bytes[i+6] == INT_13_SET_FINISHED_SEARCH[6] &&
+           option_rom.bytes[i+7] == INT_13_SET_FINISHED_SEARCH[7] &&
+           option_rom.bytes[i+8] == INT_13_SET_FINISHED_SEARCH[8] {
+            return Ok(i+9);
         }
     }
 
-    Ok(())
+    Err(OptionRomPatcherError::CouldntLocateAfterInt13Set)
 }

@@ -18,16 +18,16 @@ jobs:
     needs:
       - test
     outputs:
-      release: "${{ steps.tag-release.outputs.release }}"
-      version: "${{ steps.tag-release.outputs.version }}"
+      release: "${{ steps.check-for-existing-release.outputs.release }}"
+      version: "${{ steps.check-for-existing-release.outputs.version }}"
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - shell: bash
-        id: tag-release
-        name: tag-release
+        id: check-for-existing-release
+        name: check-for-existing-release
         run: |
           VERSION=$(yq -oy '.package.version' Cargo.toml)
 
@@ -37,7 +37,7 @@ jobs:
             exit 0
           fi
 
-          echo "Continuing to create release tag for $VERSION"
+          echo "Release required for $VERSION"
 
           echo "release=true" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
