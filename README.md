@@ -55,3 +55,5 @@ Now reboot the Amiga with the XTIDE in.
 ## Current Status
 
 The ROM patch has been tested with Amiga Janus 2.1 only, and only on an Amiga 2000 with an A2286 Bridgeboard.
+
+I've only been able to test the built executable on macOS.
